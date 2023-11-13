@@ -51,13 +51,17 @@ def print_statistics(print_stats, curr_frames, step_time, step_inference_time, t
         fps_total = curr_frames / total_time
 
         if max_epochs == -1 and max_frames == -1:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}')
+            print(f'epoch: {epoch_num:.0f} Play: {step_time:.2f}s Total: {total_time:.2f}s, fps total: {fps_total:.0f} frames: {frame:.0f}')
+            #print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}')
         elif max_epochs == -1:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}/{max_frames:.0f}')
+            print(f'epoch: {epoch_num:.0f} Play: {step_time:.2f}s Total: {total_time:.2f}s, fps total: {fps_total:.0f} frames: {frame:.0f}/{max_frames:.0f}')
+            #print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}/{max_frames:.0f}')
         elif max_frames == -1:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f}/{max_epochs:.0f} frames: {frame:.0f}')
+            print(f'epoch: {epoch_num:.0f}/{max_epochs:.0f} Play: {step_time:.2f}s Learn: {total_time - step_time:.2f}s, fps total: {fps_total:.0f} frames: {frame:.0f}')
+            #print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f}/{max_epochs:.0f} frames: {frame:.0f}')
         else:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f}/{max_epochs:.0f} frames: {frame:.0f}/{max_frames:.0f}')
+            print(f'epoch: {epoch_num:.0f}/{max_epochs:.0f} Play: {step_time:.2f}s Total: {total_time:.2f}s, fps total: {fps_total:.0f} frames: {frame:.0f}/{max_frames:.0f}')
+            #print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num:.0f}/{max_epochs:.0f} frames: {frame:.0f}/{max_frames:.0f}')
 
 
 class A2CBase(BaseAlgorithm):
@@ -236,7 +240,6 @@ class A2CBase(BaseAlgorithm):
         self.game_shaped_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
         self.game_lengths = torch_ext.AverageMeter(1, self.games_to_track).to(self.ppo_device)
         self.obs = None
-        self.games_num = self.config['minibatch_size'] // self.seq_length # it is used only for current rnn implementation
 
         self.batch_size = self.horizon_length * self.num_actors * self.num_agents
         self.batch_size_envs = self.horizon_length * self.num_actors
@@ -244,6 +247,7 @@ class A2CBase(BaseAlgorithm):
         assert(('minibatch_size_per_env' in self.config) or ('minibatch_size' in self.config))
         self.minibatch_size_per_env = self.config.get('minibatch_size_per_env', 0)
         self.minibatch_size = self.config.get('minibatch_size', self.num_actors * self.minibatch_size_per_env)
+        self.games_num = self.minibatch_size // self.seq_length # it is used only for current rnn implementation
 
         self.num_minibatches = self.batch_size // self.minibatch_size
         assert(self.batch_size % self.minibatch_size == 0)
@@ -1084,6 +1088,7 @@ class DiscreteA2CBase(A2CBase):
                     self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
                     self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
                     self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
+                    print(f"   length={mean_lengths:.1f}, reward={mean_rewards[0]:.2f}")
 
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)
@@ -1145,7 +1150,7 @@ class ContinuousA2CBase(A2CBase):
         self.is_discrete = False
         action_space = self.env_info['action_space']
         self.actions_num = action_space.shape[0]
-        self.bounds_loss_coef = self.config.get('bounds_loss_coef', None)
+        self.bounds_loss_coef = self.config.get('bounds_loss_coef', 0.0)
 
         self.clip_actions = self.config.get('clip_actions', True)
 
@@ -1362,6 +1367,7 @@ class ContinuousA2CBase(A2CBase):
                     self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
                     self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
                     self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
+                    print(f"   length={mean_lengths:.1f}, reward={mean_rewards[0]:.2f}")
 
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)

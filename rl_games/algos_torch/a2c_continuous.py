@@ -28,7 +28,7 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
         self.states = None
         self.init_rnn_from_model(self.model)
         self.last_lr = float(self.last_lr)
-        self.bound_loss_type = self.config.get('bound_loss_type', 'bound') # 'regularisation' or 'bound'
+        self.bound_loss_type = self.config.get('bound_loss_type', None) # 'regularisation' or 'bound'
         self.optimizer = optim.Adam(self.model.parameters(), float(self.last_lr), eps=1e-08, weight_decay=self.weight_decay)
 
         if self.has_central_value:
@@ -162,14 +162,14 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
         return self.train_result
 
     def reg_loss(self, mu):
-        if self.bounds_loss_coef is not None:
+        if self.bounds_loss_coef > 0.0:
             reg_loss = (mu*mu).sum(axis=-1)
         else:
             reg_loss = 0
         return reg_loss
 
     def bound_loss(self, mu):
-        if self.bounds_loss_coef is not None:
+        if self.bounds_loss_coef > 0.0:
             soft_bound = 1.1
             mu_loss_high = torch.clamp_min(mu - soft_bound, 0.0)**2
             mu_loss_low = torch.clamp_max(mu + soft_bound, 0.0)**2
